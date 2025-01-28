@@ -1,10 +1,14 @@
+import org.jetbrains.annotations.NotNull;
+
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.InputMismatchException;
 import java.util.Scanner;
 import java.time.format.DateTimeFormatter;
 public class InvestingService {
 
-    Scanner kb = new Scanner(System.in);
-    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private final Scanner kb = new Scanner(System.in);
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public void start() {
 
@@ -51,32 +55,95 @@ public class InvestingService {
     public void getStock() {
 
         /*
-        각 항목별로 입력값 유효성 검사를 구현해야함, 예를 들면 이름을 입력 받으면 엑셀에서 중복을 검사해서 이미 있다고 콘솔에 출력해주고 다시 입력받거나, 맨 처음 페이지로 가도록
-        매수 가격이나 매수 주식 수는 괜찮을 것 같은데, 날짜 유효성 검사는 확실히 필요할 듯, 이건 정규표현식..? 활용해야할 듯
-        nation 받는 것처럼 나머지 입력도 다 입력 유효성 검사하는 식으로 수정하면 될 듯
+        종목명 - 신규 주식 입력인지, 기존 주식 입력인지 따로 구분해야함
+        매수가격, 매수주식 수 - 숫자인지 검증
+        날짜 - 형식검증
         */
 
         //입력받기
         System.out.println("주식 정보를 입력하세요");
 
         Nation nation = getNation();
+
         System.out.print("종목 명:");
         String name = kb.nextLine();
-        System.out.print("매수 가격:");
-        double buyPrice = kb.nextDouble();
-        kb.nextLine();
-        System.out.print("매수 주식 수:");
-        double buyHoldings = kb.nextDouble();
-        kb.nextLine();
-        System.out.print("날짜를 입력하세요(예:2025-01-01):");
-        String buyDateStr = kb.nextLine();
-        LocalDate buyDate = LocalDate.parse(buyDateStr,formatter);
+
+        double buyPrice = getPrice();
+        double buyHoldings = getHoldings();
+        LocalDate buyDate = getDate();
 
         //생성자를 호출해서 생성
         Stock stock = new Stock(nation,name,buyPrice,buyHoldings,buyDate);
 
         //portfolio에 저장
         Portfolio.addStock(stock);
+    }
+
+    @NotNull
+    private LocalDate getDate() {
+
+        while (true) {
+
+            System.out.print("날짜를 입력하세요(예:2025-01-01):");
+            String buyDateStr = kb.nextLine();
+
+            try {
+
+                LocalDate buyDate = LocalDate.parse(buyDateStr,formatter);
+                /*
+                옛날에 산 주식일 수 있으니 과거 가능, 단 미래는 불가능
+                */
+                if (buyDate.isAfter(LocalDate.now())) {
+
+                    System.out.println("미래의 날짜는 입력할 수 없습니다. 다시 입력해주세요.");
+                    continue;
+                }
+
+                return buyDate;
+            }
+            catch (DateTimeParseException e) {
+                System.out.println("유효한 입력이 아닙니다. 다시 입력해주세요.");
+            }
+        }
+    }
+
+    private double getHoldings() {
+
+        while (true) {
+
+            System.out.print("매수 주식 수를 입력하세요:");
+
+            try {
+
+                double holdings = kb.nextDouble();
+                kb.nextLine();
+                return holdings;
+            }
+            catch (InputMismatchException e) {
+
+                System.out.println("유효한 입력이 아닙니다. 다시 입력해주세요.");
+                kb.nextLine();
+            }
+        }
+    }
+
+    private double getPrice() {
+
+        while (true) {
+
+            System.out.print("매수 가격을 입력하세요:");
+
+            try {
+
+                double price = kb.nextDouble();
+                return price;
+            }
+            catch (InputMismatchException e) {
+
+                System.out.println("유효한 입력이 아닙니다. 다시 입력해주세요.");
+                kb.nextLine();
+            }
+        }
     }
 
     private Nation getNation() {
@@ -129,12 +196,8 @@ public class InvestingService {
             } else {
 
                 //입력
-                System.out.print("매수 가격:");
-                double buyPrice = kb.nextDouble();
-                kb.nextLine();
-                System.out.print("매수 주식 수:");
-                double buyHoldings = kb.nextDouble();
-                kb.nextLine();
+                double buyPrice = getPrice();
+                double buyHoldings = getHoldings();
 
                 //Stock 객체 갱신하고 portfolio에 저장
                 Stock stock = Portfolio.getPortfolio().get(0);
@@ -142,7 +205,6 @@ public class InvestingService {
 
                 //저장함수 호출
                 ExcelService.updatePreviousStock(rowNum);
-
                 break;
             }
         }
