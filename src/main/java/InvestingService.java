@@ -1,4 +1,5 @@
 import org.jetbrains.annotations.NotNull;
+import utility.UtilityService;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -21,22 +22,22 @@ public class InvestingService {
             System.out.println("2: 신규 주식 입력하기");
             System.out.println("3: 기존 주식 정보 가져오기");
             System.out.println("4: 기존 주식 갱신하기");
-
+            System.out.println("5: 고점 대비 하락률 주가 계산하기");
             char input = kb.nextLine().charAt(0);
 
-            if (input == 'q') {
+            if (Character.toLowerCase(input) == 'q') {
 
                 System.out.println("프로그램을 종료합니다.");
                 break;
             }
             else if (input == '1') {
 
-                getStock();
+                getStock(1);
                 ExcelService.initExcelAndSave();
             }
             else if (input == '2') {
 
-                getStock();
+                getStock(2);
                 ExcelService.saveNewStockToExcel();
             }
             else if (input == '3') {
@@ -46,29 +47,58 @@ public class InvestingService {
             else if (input == '4') {
                 updateStock();
             }
+            
+            else if (input == '5') {
+                getFallPrice();
+            }
+            
             else {
                 System.out.println("잘못된 입력입니다.");
             }
         }
     }
 
-    public void getStock() {
+    private void getFallPrice() {
 
-        /*
-        종목명 - 신규 주식 입력인지, 기존 주식 입력인지 따로 구분해야함
-        매수가격, 매수주식 수 - 숫자인지 검증
-        날짜 - 형식검증
-        */
+        UtilityService us = new UtilityService();
+
+        String name = getName(1);
+        double highPrice = getPrice("고점 가격을 입력하세요:");
+        int percent = getPercent();
+
+        double targetPrice = us.calculateFallPrice(percent,highPrice);
+
+        System.out.println(name + "의 고점대비 " + percent + "% 하락한 주가는 " + targetPrice + "입니다.");
+    }
+
+    private int getPercent() {
+
+        while (true) {
+
+            System.out.print("원하는 하락률을 입력하세요:");
+
+            try {
+
+                int percent = kb.nextInt();
+                kb.nextLine();
+                return percent;
+
+            } catch (InputMismatchException e) {
+
+                System.out.println("유효한 입력이 아닙니다. 다시 입력해주세요.");
+                kb.nextLine();
+            }
+        }
+    }
+
+    public void getStock(int code) {
 
         //입력받기
         System.out.println("주식 정보를 입력하세요");
 
         Nation nation = getNation();
-
-        System.out.print("종목 명:");
-        String name = kb.nextLine();
-
-        double buyPrice = getPrice();
+        String name = getName(code);
+        double buyPrice = getPrice("매수 가격을 입력하세요:");
         double buyHoldings = getHoldings();
         LocalDate buyDate = getDate();
 
@@ -77,7 +107,26 @@ public class InvestingService {
 
         //portfolio에 저장
         Portfolio.addStock(stock);
+        }
+
+    private String getName(int code) {
+
+        while (true) {
+
+            System.out.print("종목명을 입력하세요:");
+            String name = kb.nextLine();
+
+            //if (name.equals("q")) break;
+
+            //비정상흐름(중복발생)
+            if (code == 2 && ExcelService.checkSameName(name) == -1) {
+                System.out.println("이미 존재하는 주식입니다. 다시 입력해주세요.");
+            //정상흐름
+            } else {
+                return name;
+            }
     }
+}
 
     @NotNull
     private LocalDate getDate() {
@@ -127,11 +176,11 @@ public class InvestingService {
         }
     }
 
-    private double getPrice() {
+    private double getPrice(String message) {
 
         while (true) {
 
-            System.out.print("매수 가격을 입력하세요:");
+            System.out.print(message);
 
             try {
 
@@ -196,7 +245,7 @@ public class InvestingService {
             } else {
 
                 //입력
-                double buyPrice = getPrice();
+                double buyPrice = getPrice("매수 가격을 입력하세요:");
                 double buyHoldings = getHoldings();
 
                 //Stock 객체 갱신하고 portfolio에 저장

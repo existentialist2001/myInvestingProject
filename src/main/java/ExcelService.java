@@ -146,6 +146,7 @@ public class ExcelService {
 
                 if (stockName.equals(targetName)) {
 
+                    //똑같은 이름을 찾았으면, stock 객체 생성해서 portfolio에 넣어줌
                     Nation nation = Nation.valueOf(row.getCell(0).getStringCellValue());
                     double averagePrice = row.getCell(2).getNumericCellValue();
                     double holdings = row.getCell(3).getNumericCellValue();
@@ -197,5 +198,28 @@ public class ExcelService {
         }
 
         Portfolio.getPortfolio().clear();
+    }
+
+    public static int checkSameName(String name) {
+
+        try (FileInputStream fis = new FileInputStream(FilePath);
+             Workbook wb = new XSSFWorkbook(fis)) {
+
+            Sheet sheet = wb.getSheetAt(0);
+
+            for (int rowNum = 1; rowNum <= sheet.getLastRowNum(); rowNum++) {
+
+                Row row = sheet.getRow(rowNum);
+                String stockName = row.getCell(1).getStringCellValue();
+
+                if (stockName.equals(name)) {
+                    return -1;
+                }
+            }
+        }
+        catch (IOException e) {
+            System.out.println(e);
+        }
+        return 1;
     }
 }
