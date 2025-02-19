@@ -1,3 +1,5 @@
+import utility.apiRequest.Currency;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -23,31 +25,68 @@ public class Stock {
     //최초 매수일, 투자 기간을 계산할 때 사용
     private LocalDate firstBuyDate;
 
+    //마지막 매수일
+    private LocalDate lastBuyDate;
+
+    //전체에서 차지하는 비중
+    private BigDecimal weight;
+
     //메서드
     //여기 함수들 구조를 어떻게 할지도 정해야함, return 해줘서 InvestingService에서 그 리턴 값을 받아서 쓸지, 아니면 바로 결과 출력할 지, 구조도 그려보고 구체화 하기 -> 일단은 여기서 다 출력하는 걸로
 
-    public Stock(Nation nation, String name, double price, double holdings, LocalDate firstBuyDate) {
+    public Stock(Nation nation, String name, double price, double holdings, LocalDate firstBuyDate, LocalDate lastBuyDate) {
 
         this.nation = nation;
         this.name = name;
         this.averagePrice = BigDecimal.valueOf(price);
         this.holdings = BigDecimal.valueOf(holdings);
         this.firstBuyDate = firstBuyDate;
+        this.lastBuyDate = lastBuyDate;
 
         //생성자에서 총액 구하기
         this.totalPrice = averagePrice.multiply(this.holdings);
+
+        //생성자에서 비중 구하기(나머지 변수들 다 할당하고 난 다음에 하는 거라 문제 없음)
+
     }
 
-    //투자기간 계산기
-    public Period howLongInvesting() {
+    //생성자에서 호출하는 비중 계산기
+    private void calWeight() {
 
-        LocalDate now = LocalDate.now();
-        Period period = Period.between(firstBuyDate,now);
-        return period;
+        BigDecimal bdTotalPrice = BigDecimal.valueOf(ExcelService.getTotalPrice());
+        BigDecimal temp = this.totalPrice;
+        BigDecimal currencyTemp;
+
+        if (nation.getCurrency().equals("달러")) {
+
+            BigDecimal us = BigDecimal.valueOf(Currency.getWonDollarExRate());
+            currencyTemp = temp.multiply(temp);
+        }
+        else if (nation.getCurrency().equals("엔")) {
+
+            BigDecimal jp = BigDecimal.valueOf(Currency.getWonYenExRate());
+            currencyTemp = temp.multiply(temp);
+        }
+        else {
+            currencyTemp = temp;
+        }
+
+       BigDecimal finalTotalPrice = bdTotalPrice.add(currencyTemp);
+        this.weight = currencyTemp.divide(finalTotalPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+    }
+
+    //투자기간 계산기 - 최초 매수일 기준
+    public Period howLongInvesting() {
+        return Period.between(firstBuyDate,LocalDate.now());
+    }
+
+    //투자기간 계산기 - 마지막 매수일 기준
+    public Period howLongFromLastBuy() {
+        return Period.between(lastBuyDate,LocalDate.now());
     }
 
     //추가 매수 했을 때
-    public void additionalBuy(double price, double holdings) {
+    public void additionalBuy(double price, double holdings, LocalDate lastBuyDate) {
 
         //분자
         BigDecimal previousTotalPrice = averagePrice.multiply(this.holdings);
@@ -70,6 +109,9 @@ public class Stock {
 
         //추가매수 시 총 매수 금액도 갱신
         totalPrice = this.holdings.multiply(averagePrice);
+
+        //추가매수 시 마지막 매수 날짜도 갱신, 입력을 받아야함
+        this.lastBuyDate = lastBuyDate;
         
         System.out.println(name + "을(를) " + price + "에 " + holdings + "주만큼 추가 매수하여 현재 보유 주식 수는 " + this.holdings + "주이며 평균단가는 " + averagePrice + "입니다.");
     }
@@ -112,5 +154,9 @@ public class Stock {
         return firstBuyDate;
     }
 
-    public double getTotalPrice() { return totalPrice.doubleValue(); }
+    public double getTotalPrice() { return totalPrice.doubleValue();}
+
+    public LocalDate getLastBuyDate() { return lastBuyDate; }
+
+    public int getWeight() { return weight.intValue(); }
 }

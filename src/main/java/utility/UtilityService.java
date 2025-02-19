@@ -15,4 +15,12 @@ public class UtilityService {
 
     return targetPrice.doubleValue();
     }
+
+    public int calculateHowMuchFall(double highPrice, double currentPrice) {
+
+        BigDecimal bHighPrice = BigDecimal.valueOf(highPrice);
+        BigDecimal bCurrentPrice = BigDecimal.valueOf(currentPrice);
+
+        return bHighPrice.subtract(bCurrentPrice).divide(bHighPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).intValue();
+    }
 }

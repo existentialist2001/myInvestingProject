@@ -23,6 +23,8 @@ public class InvestingService {
             System.out.println("3: 기존 주식 정보 가져오기");
             System.out.println("4: 기존 주식 갱신하기");
             System.out.println("5: 고점 대비 하락률 주가 계산하기");
+            System.out.println("6: 현재 주가의 고점대비 하락률 계산하기");
+            
             char input = kb.nextLine().charAt(0);
 
             if (Character.toLowerCase(input) == 'q') {
@@ -51,11 +53,27 @@ public class InvestingService {
             else if (input == '5') {
                 getFallPrice();
             }
-            
+
+            else if (input == '6') {
+                getFallPercent();
+            }
+
             else {
                 System.out.println("잘못된 입력입니다.");
             }
         }
+    }
+
+    private void getFallPercent() {
+
+        UtilityService us = new UtilityService();
+
+        String name = getName(1);
+        double highPrice = getPrice("고점 가격을 입력하세요:");
+        double currentPrice = getPrice("현재 가격을 입력하세요:");
+        int percent = us.calculateHowMuchFall(highPrice,currentPrice);
+
+        System.out.println(name + "는 현재 고점대비 " + percent + "% 하락 했습니다.");
     }
 
     private void getFallPrice() {
@@ -100,10 +118,11 @@ public class InvestingService {
         String name = getName(code);
         double buyPrice = getPrice("매수 가격을 입력하세요:");
         double buyHoldings = getHoldings();
-        LocalDate buyDate = getDate();
+        LocalDate firstBuyDate = getDate("최초 매수 날짜를 입력하세요(예:2025-01-01):");
+        LocalDate lastBuyDate = getDate("마지막 매수 날짜를 입력하세요(예:2025-01-01):");
 
         //생성자를 호출해서 생성
-        Stock stock = new Stock(nation,name,buyPrice,buyHoldings,buyDate);
+        Stock stock = new Stock(nation,name,buyPrice,buyHoldings,firstBuyDate,lastBuyDate);
 
         //portfolio에 저장
         Portfolio.addStock(stock);
@@ -129,11 +148,11 @@ public class InvestingService {
 }
 
     @NotNull
-    private LocalDate getDate() {
+    private LocalDate getDate(String message) {
 
         while (true) {
 
-            System.out.print("날짜를 입력하세요(예:2025-01-01):");
+            System.out.print(message);
             String buyDateStr = kb.nextLine();
 
             try {
@@ -185,6 +204,7 @@ public class InvestingService {
             try {
 
                 double price = kb.nextDouble();
+                kb.nextLine();
                 return price;
             }
             catch (InputMismatchException e) {
@@ -214,7 +234,6 @@ public class InvestingService {
         }
     }
 
-
     public void readStock() {
 
         ExcelService.readStocksFromExcel();
@@ -223,8 +242,9 @@ public class InvestingService {
 
             //출력 전에 환 단위 정하고 들어가야지
             System.out.print(stock.getNation().name() + "증시에서 투자중인 " + stock.getName() + "의 평균단가는 " + stock.getAveragePrice() + stock.getNation().getCurrency() + "이며 보유 주식 수는 " + stock.getHoldings() + "주 입니다. ");
-            System.out.println("투자기간은 총 " + stock.howLongInvesting().getYears() + "년 " + stock.howLongInvesting().getMonths() + "개월 " + stock.howLongInvesting().getDays() + "일 입니다.");
+            System.out.println("현재까지 투자기간은 총 " + stock.howLongInvesting().getYears() + "년 " + stock.howLongInvesting().getMonths() + "개월 " + stock.howLongInvesting().getDays() + "일 입니다.");
             System.out.println("현재까지 총 매수 금액은 " + stock.getTotalPrice() + stock.getNation().getCurrency() + "입니다.");
+            System.out.println("마지막으로 매수로부터 " + stock.howLongFromLastBuy().getYears() + "년 " + stock.howLongFromLastBuy().getMonths() + "개월 " + stock.howLongFromLastBuy().getDays() + "일 지났습니다.");
         }
         Portfolio.getPortfolio().clear();
     }
@@ -247,10 +267,12 @@ public class InvestingService {
                 //입력
                 double buyPrice = getPrice("매수 가격을 입력하세요:");
                 double buyHoldings = getHoldings();
+                //마지막 매수일도 받기
+                LocalDate lastBuyDate = getDate("마지막 매수 날짜를 입력하세요(예:2025-01-01):");
 
                 //Stock 객체 갱신하고 portfolio에 저장
                 Stock stock = Portfolio.getPortfolio().get(0);
-                stock.additionalBuy(buyPrice,buyHoldings);
+                stock.additionalBuy(buyPrice,buyHoldings,lastBuyDate);
 
                 //저장함수 호출
                 ExcelService.updatePreviousStock(rowNum);
