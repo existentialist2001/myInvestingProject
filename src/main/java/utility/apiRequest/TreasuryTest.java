@@ -17,7 +17,7 @@ public class TreasuryTest {
 
     //미국 10년물 국채를 의미
     private static final String SERIES_ID = "DGS10";
-    private static final String URL = "https://api.stlouisfed.org/fred/series/observations?series_id=" + SERIES_ID + "&api_key=" + API_KEY + "&file_type=json"
+    private static final String URL = "https://api.stlouisfed.org/fred/series/observations?series_id=" + SERIES_ID + "&api_key=" + API_KEY + "&file_type=json";
     public static void main(String[] args) {
 
         OkHttpClient client = new OkHttpClient();

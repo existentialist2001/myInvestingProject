@@ -15,6 +15,9 @@ public class InvestingService {
 
         System.out.println("주식투자 관리 프로그램 시작");
 
+        //미리 데이터 가져오기
+        ExcelService.updateTotalPrice();
+
         while(true) {
 
             System.out.println("메뉴를 선택하세요:(q입력 시 종료)");
@@ -121,8 +124,9 @@ public class InvestingService {
         LocalDate firstBuyDate = getDate("최초 매수 날짜를 입력하세요(예:2025-01-01):");
         LocalDate lastBuyDate = getDate("마지막 매수 날짜를 입력하세요(예:2025-01-01):");
 
-        //생성자를 호출해서 생성
+        //생성자를 호출해서 생성, 비중까지 업데이트, 총액도 업데이트
         Stock stock = new Stock(nation,name,buyPrice,buyHoldings,firstBuyDate,lastBuyDate);
+        ExcelService.setTotalPrice(stock.calNewStockWeight());
 
         //portfolio에 저장
         Portfolio.addStock(stock);
@@ -241,10 +245,13 @@ public class InvestingService {
         for (Stock stock : Portfolio.getPortfolio()) {
 
             //출력 전에 환 단위 정하고 들어가야지
+            System.out.println("----------------------------------------");
             System.out.print(stock.getNation().name() + "증시에서 투자중인 " + stock.getName() + "의 평균단가는 " + stock.getAveragePrice() + stock.getNation().getCurrency() + "이며 보유 주식 수는 " + stock.getHoldings() + "주 입니다. ");
             System.out.println("현재까지 투자기간은 총 " + stock.howLongInvesting().getYears() + "년 " + stock.howLongInvesting().getMonths() + "개월 " + stock.howLongInvesting().getDays() + "일 입니다.");
             System.out.println("현재까지 총 매수 금액은 " + stock.getTotalPrice() + stock.getNation().getCurrency() + "입니다.");
-            System.out.println("마지막으로 매수로부터 " + stock.howLongFromLastBuy().getYears() + "년 " + stock.howLongFromLastBuy().getMonths() + "개월 " + stock.howLongFromLastBuy().getDays() + "일 지났습니다.");
+            System.out.println("마지막 매수로부터 " + stock.howLongFromLastBuy().getYears() + "년 " + stock.howLongFromLastBuy().getMonths() + "개월 " + stock.howLongFromLastBuy().getDays() + "일 지났습니다.");
+            System.out.println("전체에서 차지하는 비중은 " + stock.getWeight() + "%입니다.");
+
         }
         Portfolio.getPortfolio().clear();
     }

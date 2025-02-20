@@ -45,34 +45,45 @@ public class Stock {
 
         //생성자에서 총액 구하기
         this.totalPrice = averagePrice.multiply(this.holdings);
-
-        //생성자에서 비중 구하기(나머지 변수들 다 할당하고 난 다음에 하는 거라 문제 없음)
-
+        
     }
 
-    //생성자에서 호출하는 비중 계산기
-    private void calWeight() {
+    //신규 주식 입력 시
+    /*
+    엑셀에서 가져온 총액에는, 신규 주식의 총액이 반영되어 있지 않음,
+    그래서 가져온 총액 + 신규 주식의 총액 -> 분모
+    신규 주식의 총액 -> 분자
+    */
+    public double calNewStockWeight() {
 
+        //엑셀에서 총액 계산해서 가져오기, 최신 총액 맞음
         BigDecimal bdTotalPrice = BigDecimal.valueOf(ExcelService.getTotalPrice());
+        
+        //신규 주식의 총액
         BigDecimal temp = this.totalPrice;
-        BigDecimal currencyTemp;
+        BigDecimal newStockTotalPrice;
 
+        //신규 주식의 총액을 원화로 변환해주는 과정
         if (nation.getCurrency().equals("달러")) {
 
             BigDecimal us = BigDecimal.valueOf(Currency.getWonDollarExRate());
-            currencyTemp = temp.multiply(temp);
+            newStockTotalPrice = temp.multiply(us);
         }
         else if (nation.getCurrency().equals("엔")) {
 
             BigDecimal jp = BigDecimal.valueOf(Currency.getWonYenExRate());
-            currencyTemp = temp.multiply(temp);
+            newStockTotalPrice = temp.multiply(jp);
         }
         else {
-            currencyTemp = temp;
+            newStockTotalPrice = temp;
         }
+        
+        //분모
+        BigDecimal finalTotalPrice = bdTotalPrice.add(newStockTotalPrice);
+        //계산
+        this.weight = newStockTotalPrice.divide(finalTotalPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
 
-       BigDecimal finalTotalPrice = bdTotalPrice.add(currencyTemp);
-        this.weight = currencyTemp.divide(finalTotalPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        return finalTotalPrice.doubleValue();
     }
 
     //투자기간 계산기 - 최초 매수일 기준
@@ -88,32 +99,42 @@ public class Stock {
     //추가 매수 했을 때
     public void additionalBuy(double price, double holdings, LocalDate lastBuyDate) {
 
-        //분자
-        BigDecimal previousTotalPrice = averagePrice.multiply(this.holdings);
+        //
+        //기존 총액
+        BigDecimal previousTotalPrice = BigDecimal.valueOf(ExcelService.getTotalPrice());
 
+
+        //신규 개별주식 총액
         BigDecimal newHoldings = BigDecimal.valueOf(holdings);
         BigDecimal newPrice = BigDecimal.valueOf(price);
-        BigDecimal newTotalPrice = newPrice.multiply(newHoldings);
+        BigDecimal newTotalPrice = newPrice.multiply(newHoldings).add(previousTotalPrice);
 
-        BigDecimal totalPrice = previousTotalPrice.add(newTotalPrice);
+        //기존 총액 갱신
+        BigDecimal finalTotalPrice = previousTotalPrice.add(newTotalPrice);
+        ExcelService.setTotalPrice(finalTotalPrice.doubleValue());
 
-        //분모
+        //기존 개별주식 총액 갱신
+        this.totalPrice = this.totalPrice.add(newTotalPrice);
+
+        //비중 갱신
+        this.weight = this.totalPrice.divide(finalTotalPrice,0,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+
+
         BigDecimal totalHoldings = this.holdings.add(newHoldings);
 
         //계산
-        BigDecimal finalAvgPrice = totalPrice.divide(totalHoldings,2,RoundingMode.HALF_UP);
+        BigDecimal finalAvgPrice = this.totalPrice.divide(totalHoldings,2,RoundingMode.HALF_UP);
 
         //반영
         this.holdings = totalHoldings;
-        averagePrice = finalAvgPrice;
+        this.averagePrice = finalAvgPrice;
 
-        //추가매수 시 총 매수 금액도 갱신
-        totalPrice = this.holdings.multiply(averagePrice);
 
         //추가매수 시 마지막 매수 날짜도 갱신, 입력을 받아야함
         this.lastBuyDate = lastBuyDate;
-        
+
         System.out.println(name + "을(를) " + price + "에 " + holdings + "주만큼 추가 매수하여 현재 보유 주식 수는 " + this.holdings + "주이며 평균단가는 " + averagePrice + "입니다.");
+        System.out.println("전체에서 차지하는 비중은 " + weight.intValue() + "%입니다.");
     }
 
     //수익률 계산기
