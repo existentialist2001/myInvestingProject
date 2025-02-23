@@ -9,7 +9,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellType;
 
 public class ExcelService {
 
@@ -24,7 +26,6 @@ public class ExcelService {
 
         Stock stock = Portfolio.getPortfolio().get(0);
 
-
         //엑셀 읽기
         try (FileInputStream fis = new FileInputStream(FilePath);
              Workbook wb = new XSSFWorkbook(fis)) {
@@ -36,15 +37,8 @@ public class ExcelService {
             //가상 엑셀에 쓰기
             writeData(newRow,stock);
 
-            //기존 주식들의 비중도 갱신된 총액에 따라 갱신하고, 써주기
-            for (int i = 1; i < sheet.getLastRowNum() - 1; i++) {
-
-                Row excelStock = sheet.getRow(i);
-                BigDecimal eachTotalPrice = BigDecimal.valueOf(excelStock.getCell(5).getNumericCellValue());
-                int newWeight = eachTotalPrice.divide(BigDecimal.valueOf(ExcelService.getTotalPrice()),0,RoundingMode.HALF_UP).intValue();
-                Cell weightCell = excelStock.getCell(7);
-                weightCell.setCellValue(newWeight);
-            }
+            //기존 주식들의 비중도 갱신
+            updatePreviousStocksWeight(sheet);
 
             //자동 열 너비 조정
             for (int i = 0; i < 4; i++) {
@@ -66,8 +60,37 @@ public class ExcelService {
         }
 
         Portfolio.getPortfolio().clear();
-        //엑셀 갱신 후 전체값 갱신하는 작업
-        updateTotalPrice();
+    }
+
+    //신규 주식 입력이나 기존 주식 추가 매수 후, 나머지 주식들의 비중을 업데이트하는 함수
+    private static void updatePreviousStocksWeight(Sheet sheet) {
+
+        for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+
+            Row excelStock = sheet.getRow(i);
+            BigDecimal eachTotalPrice = BigDecimal.valueOf(excelStock.getCell(5).getNumericCellValue());
+            String nation = excelStock.getCell(0).getStringCellValue();
+
+            //바로 위에서 가져온 각 총액을 원화로 변환해주어야함
+            double us = Currency.getWonDollarExRate();
+            double jp = Currency.getWonYenExRate();
+
+            BigDecimal curEachTotalPrice;
+            //환율 반영
+            if (nation.equals("미국")) {
+                curEachTotalPrice = eachTotalPrice.multiply(BigDecimal.valueOf(us));
+            }
+            else if (nation.equals("일본")) {
+                curEachTotalPrice = eachTotalPrice.multiply(BigDecimal.valueOf(jp));
+            }
+            else {
+                curEachTotalPrice = eachTotalPrice;
+            }
+
+            int newWeight = curEachTotalPrice.divide(BigDecimal.valueOf(ExcelService.getTotalPrice()),2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).intValue();
+            Cell weightCell = excelStock.getCell(7);
+            weightCell.setCellValue(newWeight);
+        }
     }
 
     public static void initExcelAndSave() {
@@ -89,6 +112,7 @@ public class ExcelService {
         //추가
         headerRow.createCell(6).setCellValue("마지막 매수일");
         headerRow.createCell(7).setCellValue("비중");
+        headerRow.createCell(8).setCellValue("티커");
 
         // 데이터 작성
         Row dataRow = sheet.createRow(1);
@@ -130,6 +154,9 @@ public class ExcelService {
         dataRow.createCell(5).setCellValue(stock.getTotalPrice());
         dataRow.createCell(6).setCellValue(stock.getLastBuyDate().format(DateTimeFormatter.ISO_DATE));
         dataRow.createCell(7).setCellValue(stock.getWeight());
+
+        //티커 추가
+        dataRow.createCell(8).setCellValue(stock.getTicker());
     }
 
     //엑셀에서 다 긁어와서 stock 객체를 만들어준 후, Portfolio에 다 넣는 것
@@ -153,8 +180,19 @@ public class ExcelService {
                 LocalDate fdate = LocalDate.parse(firstBuyDate,formatter);
                 String lastBuyDate = row.getCell(6).getStringCellValue();
                 LocalDate ldate = LocalDate.parse(lastBuyDate,formatter);
+                double weight = row.getCell(7).getNumericCellValue();
 
-                Portfolio.getPortfolio().add(new Stock(nation,name,averagePrice,holdings,fdate,ldate));
+                //티커 추가
+                String ticker;
+                //티커가 한국 주식이어서 숫자면
+                if (row.getCell(8).getCellType() == CellType.NUMERIC) {
+                    ticker = String.valueOf((int)row.getCell(8).getNumericCellValue());
+                }
+                //티커가 미국 주식이어서 문자면
+                else {
+                    ticker = row.getCell(8).getStringCellValue();
+                }
+                Portfolio.getPortfolio().add(new Stock(nation,name,averagePrice,holdings,fdate,ldate,weight,ticker));
             }
         }
         catch (IOException e) {
@@ -211,14 +249,14 @@ public class ExcelService {
 
             int avgPriceCellNum = 2;
             int holdingsCellNum = 3;
-            int totalPirceCellNum = 5;
+            int totalPriceCellNum = 5;
             int lastBuyDateCellNum = 6;
             int weightCellNum = 7;
 
             Row row = sheet.getRow(rowNum);
             Cell avgPriceCell = row.getCell(avgPriceCellNum);
             Cell holdingsCell = row.getCell(holdingsCellNum);
-            Cell totalPriceCell = row.getCell(totalPirceCellNum);
+            Cell totalPriceCell = row.getCell(totalPriceCellNum);
             Cell lastBuyDateCell = row.getCell(lastBuyDateCellNum);
 
             Cell weightCell = row.getCell(weightCellNum);
@@ -230,17 +268,7 @@ public class ExcelService {
             lastBuyDateCell.setCellValue(stock.getLastBuyDate().format(DateTimeFormatter.ISO_DATE));
             weightCell.setCellValue(stock.getWeight());
 
-            //엑셀에 쓰기 전에 나머지 주식들도 비중 갱신
-            //기존 주식들의 비중도 갱신된 총액에 따라 갱신하고, 써주기
-        /*    for (int i = 1; i < sheet.getLastRowNum(); i++) {
-
-                Row excelStock = sheet.getRow(i);
-                BigDecimal eachTotalPrice = BigDecimal.valueOf(excelStock.getCell(5).getNumericCellValue());
-                int newWeight = eachTotalPrice.divide(BigDecimal.valueOf(ExcelService.getTotalPrice()),0,RoundingMode.HALF_UP).intValue();
-                Cell weightCell = excelStock.getCell(7);
-                weightCell.setCellValue(newWeight);
-            }*/
-
+            updatePreviousStocksWeight(sheet);
 
             try (FileOutputStream fos = new FileOutputStream(FilePath);) {
 
@@ -288,9 +316,7 @@ public class ExcelService {
         //원 달러 환율 받아오기
         //원 엔 환율 받아오기
         BigDecimal usd = BigDecimal.valueOf(Currency.getWonDollarExRate());
-        System.out.println("usd = " + usd);
         BigDecimal jpy = BigDecimal.valueOf(Currency.getWonYenExRate());
-        System.out.println("jpy = " + jpy);
 
         //데이터에서 총액과 국가만 긁어오면서 국가에 따라 환전하기
         try (FileInputStream fis = new FileInputStream(FilePath);
@@ -304,9 +330,7 @@ public class ExcelService {
                 Row row = sheet.getRow(rowIndex);
 
                 Nation nation = Nation.valueOf(row.getCell(0).getStringCellValue());
-                BigDecimal averagePrice = BigDecimal.valueOf(row.getCell(2).getNumericCellValue());
-                BigDecimal holdings = BigDecimal.valueOf(row.getCell(3).getNumericCellValue());
-                BigDecimal temp = averagePrice.multiply(holdings).setScale(2,RoundingMode.HALF_UP);
+                BigDecimal temp = BigDecimal.valueOf(row.getCell(5).getNumericCellValue());
 
                 //환율 반영
                 if (nation.getCurrency().equals("달러")) {
@@ -339,7 +363,6 @@ public class ExcelService {
     public static void updateTotalPrice() {
 
         totalPrice = calculateTotalPrice();
-        System.out.println("총액 계산 완료, 총액 = " + totalPrice);
     }
 
     public static void setTotalPrice(double newTotalPrice) {

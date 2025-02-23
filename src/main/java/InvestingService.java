@@ -1,5 +1,7 @@
 import org.jetbrains.annotations.NotNull;
 import utility.UtilityService;
+import utility.apiRequest.KrStockInfo;
+import utility.apiRequest.UsStockInfo;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -74,7 +76,7 @@ public class InvestingService {
         String name = getName(1);
         double highPrice = getPrice("고점 가격을 입력하세요:");
         double currentPrice = getPrice("현재 가격을 입력하세요:");
-        int percent = us.calculateHowMuchFall(highPrice,currentPrice);
+        double percent = us.calculateHowMuchFall(highPrice,currentPrice);
 
         System.out.println(name + "는 현재 고점대비 " + percent + "% 하락 했습니다.");
     }
@@ -119,18 +121,26 @@ public class InvestingService {
 
         Nation nation = getNation();
         String name = getName(code);
+
+        String ticker = getTicker();
+
         double buyPrice = getPrice("매수 가격을 입력하세요:");
         double buyHoldings = getHoldings();
         LocalDate firstBuyDate = getDate("최초 매수 날짜를 입력하세요(예:2025-01-01):");
         LocalDate lastBuyDate = getDate("마지막 매수 날짜를 입력하세요(예:2025-01-01):");
 
         //생성자를 호출해서 생성, 비중까지 업데이트, 총액도 업데이트
-        Stock stock = new Stock(nation,name,buyPrice,buyHoldings,firstBuyDate,lastBuyDate);
+        Stock stock = new Stock(nation, name, buyPrice, buyHoldings, firstBuyDate, lastBuyDate, ticker);
         ExcelService.setTotalPrice(stock.calNewStockWeight());
 
         //portfolio에 저장
         Portfolio.addStock(stock);
         }
+
+    private String getTicker() {
+        System.out.print("티커를 입력하세요:");
+        return kb.nextLine();
+    }
 
     private String getName(int code) {
 
@@ -244,6 +254,25 @@ public class InvestingService {
 
         for (Stock stock : Portfolio.getPortfolio()) {
 
+            //티커를 바탕으로 검색해서 현재가, 최고가를 가져오고, 그 가져온 걸 다시 함수에 넣어줘서 하락률 계산
+            //한국인지 미국인지에 따라 나눠야지
+            double currentStockPrice = 0;
+            double highestStockPrice = 0;
+            double fallPercent = 0;
+
+            if (stock.getNation().getCurrency().equals("원")) {
+
+                currentStockPrice = KrStockInfo.getCurrentStockPrice(stock.getTicker());
+                highestStockPrice = KrStockInfo.getHighestStockPrice(stock.getTicker());
+            }
+            else {
+
+                currentStockPrice = UsStockInfo.getCurrentStockPrice(stock.getTicker());
+                highestStockPrice = UsStockInfo.getHighestStockPrice(stock.getTicker());
+            }
+
+            fallPercent = UtilityService.calculateHowMuchFall(highestStockPrice,currentStockPrice);
+
             //출력 전에 환 단위 정하고 들어가야지
             System.out.println("----------------------------------------");
             System.out.print(stock.getNation().name() + "증시에서 투자중인 " + stock.getName() + "의 평균단가는 " + stock.getAveragePrice() + stock.getNation().getCurrency() + "이며 보유 주식 수는 " + stock.getHoldings() + "주 입니다. ");
@@ -251,6 +280,7 @@ public class InvestingService {
             System.out.println("현재까지 총 매수 금액은 " + stock.getTotalPrice() + stock.getNation().getCurrency() + "입니다.");
             System.out.println("마지막 매수로부터 " + stock.howLongFromLastBuy().getYears() + "년 " + stock.howLongFromLastBuy().getMonths() + "개월 " + stock.howLongFromLastBuy().getDays() + "일 지났습니다.");
             System.out.println("전체에서 차지하는 비중은 " + stock.getWeight() + "%입니다.");
+            System.out.println("52주 최고가 대비 " + fallPercent + "% 떨어졌습니다.");
 
         }
         Portfolio.getPortfolio().clear();
@@ -280,6 +310,7 @@ public class InvestingService {
                 //Stock 객체 갱신하고 portfolio에 저장
                 Stock stock = Portfolio.getPortfolio().get(0);
                 stock.additionalBuy(buyPrice,buyHoldings,lastBuyDate);
+
 
                 //저장함수 호출
                 ExcelService.updatePreviousStock(rowNum);

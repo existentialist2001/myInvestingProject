@@ -5,7 +5,7 @@ import java.math.RoundingMode;
 
 public class UtilityService {
 
-    public double calculateFallPrice(int percent, double highPrice) {
+    public static double calculateFallPrice(int percent, double highPrice) {
 
     BigDecimal bHighPrice = BigDecimal.valueOf(highPrice);
     BigDecimal bPercent = BigDecimal.valueOf(percent);
@@ -16,11 +16,17 @@ public class UtilityService {
     return targetPrice.doubleValue();
     }
 
-    public int calculateHowMuchFall(double highPrice, double currentPrice) {
+    public static double calculateHowMuchFall(double highPrice, double currentPrice) {
 
         BigDecimal bHighPrice = BigDecimal.valueOf(highPrice);
         BigDecimal bCurrentPrice = BigDecimal.valueOf(currentPrice);
 
-        return bHighPrice.subtract(bCurrentPrice).divide(bHighPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).intValue();
+        return bHighPrice.subtract(bCurrentPrice).divide(bHighPrice,4,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100)).doubleValue();
     }
+
+    /*public static void main(String[] args) {
+
+        double percent = calculateHowMuchFall(226.40,198.24);
+        System.out.println("percent = " + percent);
+    }*/
 }

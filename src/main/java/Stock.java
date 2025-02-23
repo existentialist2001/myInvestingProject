@@ -31,9 +31,32 @@ public class Stock {
     //전체에서 차지하는 비중
     private BigDecimal weight;
 
+    private String ticker;
+
     //메서드
     //여기 함수들 구조를 어떻게 할지도 정해야함, return 해줘서 InvestingService에서 그 리턴 값을 받아서 쓸지, 아니면 바로 결과 출력할 지, 구조도 그려보고 구체화 하기 -> 일단은 여기서 다 출력하는 걸로
 
+    //신규 주식 매수 시
+    public Stock(Nation nation, String name, double price, double holdings, LocalDate firstBuyDate, LocalDate lastBuyDate, String ticker) {
+
+        this.nation = nation;
+        this.name = name;
+        this.averagePrice = BigDecimal.valueOf(price);
+        this.holdings = BigDecimal.valueOf(holdings);
+        this.firstBuyDate = firstBuyDate;
+        this.lastBuyDate = lastBuyDate;
+
+        //티커
+        this.ticker = ticker;
+
+        //생성자에서 총액 구하기
+        this.totalPrice = averagePrice.multiply(this.holdings);
+
+        //비중 구해야해..
+        calNewStockWeight();
+    }
+
+    //기존 주식 추가 매수 시
     public Stock(Nation nation, String name, double price, double holdings, LocalDate firstBuyDate, LocalDate lastBuyDate) {
 
         this.nation = nation;
@@ -45,8 +68,31 @@ public class Stock {
 
         //생성자에서 총액 구하기
         this.totalPrice = averagePrice.multiply(this.holdings);
-        
+
+        //비중 구해야해..
+        calNewStockWeight();
     }
+
+    //주식 정보 읽어오기 할 때 사용하는 생성자
+    public Stock(Nation nation, String name, double price, double holdings, LocalDate firstBuyDate, LocalDate lastBuyDate, double weight, String ticker) {
+
+        this.nation = nation;
+        this.name = name;
+        this.averagePrice = BigDecimal.valueOf(price);
+        this.holdings = BigDecimal.valueOf(holdings);
+        this.firstBuyDate = firstBuyDate;
+        this.lastBuyDate = lastBuyDate;
+
+        //생성자에서 총액 구하기
+        this.totalPrice = averagePrice.multiply(this.holdings);
+
+        //비중
+        this.weight = BigDecimal.valueOf(weight);
+
+        //티커
+        this.ticker = ticker;
+    }
+
 
     //신규 주식 입력 시
     /*
@@ -99,27 +145,57 @@ public class Stock {
     //추가 매수 했을 때
     public void additionalBuy(double price, double holdings, LocalDate lastBuyDate) {
 
+        BigDecimal us = BigDecimal.valueOf(Currency.getWonDollarExRate());
+        BigDecimal jp = BigDecimal.valueOf(Currency.getWonYenExRate());
         //
         //기존 총액
         BigDecimal previousTotalPrice = BigDecimal.valueOf(ExcelService.getTotalPrice());
 
-
         //신규 개별주식 총액
         BigDecimal newHoldings = BigDecimal.valueOf(holdings);
         BigDecimal newPrice = BigDecimal.valueOf(price);
-        BigDecimal newTotalPrice = newPrice.multiply(newHoldings).add(previousTotalPrice);
+
+        //이걸 원화로 바꿔서 더해줘야지
+        BigDecimal newTotalPrice = newPrice.multiply(newHoldings);
+        BigDecimal curNewTotalPrice;
 
         //기존 총액 갱신
-        BigDecimal finalTotalPrice = previousTotalPrice.add(newTotalPrice);
+
+        //신규 주식의 총액을 원화로 변환해주는 과정
+        if (nation.getCurrency().equals("달러")) {
+            curNewTotalPrice = newTotalPrice.multiply(us);
+
+        }
+        else if (nation.getCurrency().equals("엔")) {
+            curNewTotalPrice = newTotalPrice.multiply(jp);
+        }
+        else {
+            curNewTotalPrice = newTotalPrice.multiply(BigDecimal.valueOf(1));
+        }
+
+        //이제 총액 갱신
+        BigDecimal finalTotalPrice = previousTotalPrice.add(curNewTotalPrice);
         ExcelService.setTotalPrice(finalTotalPrice.doubleValue());
 
-        //기존 개별주식 총액 갱신
+        //기존 개별주식 총액 갱신,
         this.totalPrice = this.totalPrice.add(newTotalPrice);
 
-        //비중 갱신
-        this.weight = this.totalPrice.divide(finalTotalPrice,0,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+        //비중 갱신, 이것도 문제가 환율 반영 안해줌, 환율 반영해준 분자 만드는 과정
+        BigDecimal wonTotalPrice;
 
+        if (nation.getCurrency().equals("달러")) {
+            wonTotalPrice = this.totalPrice.multiply(us);
+        }
+        else if (nation.getCurrency().equals("엔")) {
+            wonTotalPrice = this.totalPrice.multiply(jp);
+        }
+        else {
+            wonTotalPrice = this.totalPrice.multiply(BigDecimal.valueOf(1));
+        }
 
+        this.weight = wonTotalPrice.divide(finalTotalPrice,2,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100));
+
+        //주식 수
         BigDecimal totalHoldings = this.holdings.add(newHoldings);
 
         //계산
@@ -128,7 +204,6 @@ public class Stock {
         //반영
         this.holdings = totalHoldings;
         this.averagePrice = finalAvgPrice;
-
 
         //추가매수 시 마지막 매수 날짜도 갱신, 입력을 받아야함
         this.lastBuyDate = lastBuyDate;
@@ -180,4 +255,6 @@ public class Stock {
     public LocalDate getLastBuyDate() { return lastBuyDate; }
 
     public int getWeight() { return weight.intValue(); }
+
+    public String getTicker() { return ticker; }
 }
